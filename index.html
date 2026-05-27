@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Selsey — Generator Etykiet</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: #f4f4f2;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .app { width: 100%; max-width: 620px; }
+    .logo-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 2rem; }
+    .logo-box { background: #111; color: white; padding: 6px 14px; border-radius: 6px; font-size: 20px; font-weight: 700; }
+    .logo-box span { font-weight: 400; }
+    .logo-bar h1 { font-size: 16px; font-weight: 500; color: #555; }
+    .card { background: white; border-radius: 14px; border: 1px solid #e5e4df; padding: 1.5rem; margin-bottom: 1rem; }
+    .card-title { font-size: 13px; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 1rem; }
+    .field { margin-bottom: 1.2rem; }
+    .field:last-child { margin-bottom: 0; }
+    label { display: block; font-size: 13px; color: #888; margin-bottom: 6px; font-weight: 500; }
+    input[type="text"], select, input[type="number"] {
+      width: 100%; padding: 10px 14px; font-size: 15px;
+      border: 1px solid #ddd; border-radius: 8px; outline: none;
+      background: #fafafa; color: #111; font-family: inherit;
+    }
+    input[type="text"]:focus, select:focus { border-color: #111; background: white; }
+    input[type="number"] { width: 80px; }
+    .copies-row { display: flex; align-items: center; gap: 12px; }
+    .copies-row label { margin: 0; }
+    .btn-row { display: flex; gap: 10px; margin-bottom: 1.5rem; }
+    .btn-primary { flex: 1; padding: 12px; font-size: 14px; font-weight: 600; background: #111; color: white; border: none; border-radius: 10px; cursor: pointer; }
+    .btn-primary:hover { opacity: 0.8; }
+    .btn-print { flex: 1; padding: 12px; font-size: 14px; font-weight: 500; background: white; color: #111; border: 1px solid #ccc; border-radius: 10px; cursor: pointer; }
+    .btn-print:hover { background: #f0f0ee; }
+    .manage-toggle { width: 100%; padding: 10px; font-size: 13px; font-weight: 500; background: transparent; color: #888; border: 1px dashed #ccc; border-radius: 10px; cursor: pointer; margin-bottom: 1rem; }
+    .manage-toggle:hover { background: #f0f0ee; }
+    .manage-panel { display: none; }
+    .manage-panel.open { display: block; }
+    .add-row { display: flex; gap: 8px; margin-bottom: 1rem; }
+    .add-row input { flex: 1; margin: 0; }
+    .btn-add { padding: 10px 16px; font-size: 14px; font-weight: 600; background: #111; color: white; border: none; border-radius: 8px; cursor: pointer; }
+    .courier-list { display: flex; flex-direction: column; gap: 6px; }
+    .courier-item { display: flex; align-items: center; justify-content: space-between; background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 8px 12px; font-size: 14px; }
+    .btn-del { background: none; border: none; cursor: pointer; color: #ccc; font-size: 18px; }
+    .btn-del:hover { color: #e53e3e; }
+    .reset-link { display: block; text-align: center; margin-top: 10px; font-size: 12px; color: #aaa; cursor: pointer; text-decoration: underline; }
+    .preview-label { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; margin-top: 1rem; }
+    .label-preview {
+      background: white; border: 2px solid #ddd; border-radius: 8px;
+      width: 100%; aspect-ratio: 297 / 210; overflow: hidden; position: relative;
+    }
+    .placeholder-text { color: #bbb; font-size: 14px; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="logo-bar">
+      <div class="logo-box"><span>+</span>Selsey</div>
+      <h1>Generator etykiet</h1>
+    </div>
+    <div class="card">
+      <div class="field">
+        <label for="order-input">Numer zamówienia (pełny)</label>
+        <input type="text" id="order-input" placeholder="np. PICK/08044/26/05/CL1" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="courier-select">Kurier / sposób dostawy</label>
+        <select id="courier-select"></select>
+      </div>
+      <div class="field">
+        <div class="copies-row">
+          <label for="copies-input">Liczba kopii:</label>
+          <input type="number" id="copies-input" value="1" min="1" max="20" />
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="updatePreview()">Podgląd</button>
+      <button class="btn-print" onclick="printLabel()">🖨 Drukuj / PDF</button>
+    </div>
+    <button class="manage-toggle" onclick="toggleManage()">⚙️ Zarządzaj kurierami</button>
+    <div class="card manage-panel" id="manage-panel">
+      <div class="card-title">Dodaj / usuń kuriera</div>
+      <div class="add-row">
+        <input type="text" id="new-courier" placeholder="Nazwa nowego kuriera..." />
+        <button class="btn-add" onclick="addCourier()">Dodaj</button>
+      </div>
+      <div class="courier-list" id="courier-list"></div>
+      <span class="reset-link" onclick="resetCouriers()">Przywróć domyślną listę</span>
+    </div>
+    <p class="preview-label">Podgląd etykiety (A4 poziomo)</p>
+    <div class="label-preview" id="label-preview">
+      <span class="placeholder-text">wprowadź numer zamówienia</span>
+    </div>
+  </div>
+
+  <script>
+    const DEFAULT_COURIERS = [
+      'ZADBANO','KUEHNE NAGEL','BEJOT','SCHENKER','SPT',
+      'SUUS','AMBRO','BEJOT WF','ODBIÓR WŁASNY B2B','NOVYNABYTOK','TRANSPORT DEDYKOWANY'
+    ];
+    const STORAGE_KEY = 'selsey_couriers';
+    function getCouriers() {
+      try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : [...DEFAULT_COURIERS]; }
+      catch(e) { return [...DEFAULT_COURIERS]; }
+    }
+    function saveCouriers(list) { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
+    function renderSelect() {
+      const sel = document.getElementById('courier-select');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">— wybierz kuriera —</option>';
+      getCouriers().forEach(c => {
+        const o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        if (c === cur) o.selected = true;
+        sel.appendChild(o);
+      });
+    }
+    function renderList() {
+      const list = document.getElementById('courier-list');
+      list.innerHTML = '';
+      getCouriers().forEach((c, i) => {
+        const d = document.createElement('div');
+        d.className = 'courier-item';
+        d.innerHTML = `<span>${c}</span><button class="btn-del" onclick="removeCourier(${i})">×</button>`;
+        list.appendChild(d);
+      });
+    }
+    function addCourier() {
+      const inp = document.getElementById('new-courier');
+      const val = inp.value.trim().toUpperCase();
+      if (!val) return;
+      const c = getCouriers();
+      if (c.includes(val)) { alert('Ten kurier już jest na liście.'); return; }
+      c.push(val); saveCouriers(c); inp.value = '';
+      renderSelect(); renderList();
+    }
+    function removeCourier(i) {
+      const c = getCouriers();
+      if (!confirm(`Usunąć "${c[i]}"?`)) return;
+      c.splice(i,1); saveCouriers(c); renderSelect(); renderList();
+    }
+    function resetCouriers() {
+      if (!confirm('Przywrócić domyślną listę?')) return;
+      localStorage.removeItem(STORAGE_KEY); renderSelect(); renderList();
+    }
+    function toggleManage() { document.getElementById('manage-panel').classList.toggle('open'); }
+    document.getElementById('new-courier').addEventListener('keydown', e => { if(e.key==='Enter') addCourier(); });
+
+    const orderInput = document.getElementById('order-input');
+    const courierSelect = document.getElementById('courier-select');
+    orderInput.addEventListener('input', updatePreview);
+    courierSelect.addEventListener('change', updatePreview);
+
+    function splitOrder(str) {
+      const p = str.split('/');
+      if (p.length >= 5) return [p[0]+'/'+p[1], '/'+p[2]+'/'+p[3]+'/'+p[4]];
+      if (p.length === 4) return [p[0]+'/'+p[1], '/'+p[2]+'/'+p[3]];
+      return [str, null];
+    }
+
+    function fitFontSize(text, maxW, maxH) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      let fs = 10;
+      while (fs < 2000) {
+        ctx.font = `900 ${fs}px Arial`;
+        if (ctx.measureText(text).width >= maxW || fs >= maxH) break;
+        fs++;
+      }
+      return fs - 1;
+    }
+
+    function updatePreview() {
+      const num = orderInput.value.trim();
+      const courier = courierSelect.value;
+      const preview = document.getElementById('label-preview');
+
+      if (!num) {
+        preview.innerHTML = '<span class="placeholder-text">wprowadź numer zamówienia</span>';
+        return;
+      }
+
+      const [l1, l2] = splitOrder(num);
+      const W = preview.clientWidth;
+      const H = preview.clientHeight;
+      const PAD = W * 0.04;
+      const availW = W - PAD * 2;
+
+      const logoH = H * 0.18;
+      const topPad = H * 0.02;
+      const gap = H * 0.025;
+      const lines = l2 ? 2 : 1;
+      const courierGap = H * 0.05;
+
+      // total rows: order lines + courier
+      const totalRows = lines + (courier ? 1 : 0);
+      const availH = H - logoH - topPad - PAD - gap * (totalRows - 1) - (courier ? courierGap : 0);
+      const rowH = availH / totalRows;
+
+      const longestOrder = [l1, l2||''].filter(Boolean).sort((a,b)=>b.length-a.length)[0];
+      const orderFs = Math.min(fitFontSize(longestOrder, availW, 9999), Math.floor(rowH * 0.92));
+
+      let courierFs = 0;
+      if (courier) {
+        courierFs = Math.min(fitFontSize(courier, availW, 9999), Math.floor(rowH * 0.92));
+      }
+
+      // order lines — left aligned
+      let orderHtml = `<div style="font-family:Arial,sans-serif;font-size:${orderFs}px;font-weight:900;color:#111;line-height:1.0;white-space:nowrap;text-align:left;">${l1}</div>`;
+      if (l2) orderHtml += `<div style="margin-top:${gap}px;font-family:Arial,sans-serif;font-size:${orderFs}px;font-weight:900;color:#111;line-height:1.0;white-space:nowrap;text-align:left;">${l2}</div>`;
+
+      // courier — centered
+      const courierHtml = courier
+        ? `<div style="margin-top:${courierGap}px;font-family:Arial,sans-serif;font-size:${courierFs}px;font-weight:900;color:#111;line-height:1.0;white-space:nowrap;text-align:center;width:100%;">${courier}</div>`
+        : '';
+
+      preview.innerHTML = `
+        <div style="position:absolute;top:${topPad}px;left:${PAD}px;font-family:Arial,sans-serif;font-size:${logoH*0.65}px;font-weight:700;color:#111;line-height:1;">
+          <span style="font-weight:400">+</span>Selsey
+        </div>
+        <div style="position:absolute;top:${topPad+logoH}px;left:${PAD}px;right:${PAD}px;">
+          ${orderHtml}
+          ${courierHtml}
+        </div>
+      `;
+    }
+
+    function printLabel() {
+      const num = orderInput.value.trim();
+      const courier = courierSelect.value;
+      const copies = parseInt(document.getElementById('copies-input').value) || 1;
+      if (!num) { alert('Wprowadź numer zamówienia.'); return; }
+      if (!courier) { alert('Wybierz kuriera.'); return; }
+
+      const [l1, l2] = splitOrder(num);
+      const PW = 2970, PH = 2100;
+      const PAD = 90;
+      const availW = PW - PAD * 2;
+      const logoH = PH * 0.18;
+      const topPad = PH * 0.02;
+      const gap = PH * 0.025;
+      const courierGap = PH * 0.05;
+      const lines = l2 ? 2 : 1;
+      const totalRows = lines + 1;
+      const availH = PH - logoH - topPad - PAD - gap * (totalRows - 1) - courierGap;
+      const rowH = availH / totalRows;
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      const longestOrder = [l1, l2||''].filter(Boolean).sort((a,b)=>b.length-a.length)[0];
+      let ofs = 10;
+      while (ofs < 3000) {
+        ctx.font = `900 ${ofs}px Arial`;
+        if (ctx.measureText(longestOrder).width >= availW || ofs >= rowH) break;
+        ofs++;
+      }
+      ofs--;
+
+      let cfs = 10;
+      while (cfs < 3000) {
+        ctx.font = `900 ${cfs}px Arial`;
+        if (ctx.measureText(courier).width >= availW || cfs >= rowH) break;
+        cfs++;
+      }
+      cfs--;
+
+      const logoY = topPad + logoH * 0.75;
+      const order1Y = topPad + logoH + ofs;
+      const order2Y = order1Y + gap + ofs;
+      const lastOrderY = l2 ? order2Y : order1Y;
+      const courierY = lastOrderY + courierGap + cfs;
+
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PW} ${PH}" width="${PW}" height="${PH}">
+        <rect width="${PW}" height="${PH}" fill="white"/>
+        <text x="${PAD}" y="${logoY}" font-family="Arial" font-size="${Math.round(logoH*0.65)}" font-weight="700" fill="#111">+Selsey</text>
+        <text x="${PAD}" y="${order1Y}" font-family="Arial" font-size="${ofs}" font-weight="900" fill="#111">${l1}</text>
+        ${l2 ? `<text x="${PAD}" y="${order2Y}" font-family="Arial" font-size="${ofs}" font-weight="900" fill="#111">${l2}</text>` : ''}
+        <text x="${PW/2}" y="${courierY}" font-family="Arial" font-size="${cfs}" font-weight="900" fill="#111" text-anchor="middle">${courier}</text>
+      </svg>`;
+
+      const b64 = btoa(unescape(encodeURIComponent(svg)));
+      let labels = '';
+      for (let i = 0; i < copies; i++) {
+        const pb = i < copies-1 ? 'page-break-after:always;' : '';
+        labels += `<div style="width:297mm;height:210mm;${pb}overflow:hidden;">
+          <img src="data:image/svg+xml;base64,${b64}" style="width:297mm;height:210mm;display:block;" />
+        </div>`;
+      }
+
+      const win = window.open('', '_blank');
+      win.document.write(`<!DOCTYPE html><html><head><title>Etykieta ${num}</title>
+        <style>*{margin:0;padding:0;box-sizing:border-box;}body{background:white;}@media print{body{background:white;}@page{size:A4 landscape;margin:0;}}</style>
+      </head><body>${labels}</body></html>`);
+      win.document.close();
+      win.focus();
+      setTimeout(() => win.print(), 600);
+    }
+
+    renderSelect(); renderList(); updatePreview();
+    window.addEventListener('resize', updatePreview);
+  </script>
+</body>
+</html>
